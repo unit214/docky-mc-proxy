@@ -1,5 +1,5 @@
 # on every pr check ifs the code is still building
-
+name: "Main"
 on:
   pull_request:
     branches:

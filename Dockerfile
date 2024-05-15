@@ -18,8 +18,8 @@ WORKDIR /usr/src/docky-mc-proxy
 # Build your Rust project
 RUN cargo build --release
 
-# Rename build to be more suiting
-RUN mv ./target/release/docky-mc-proxy dmp
+# Setup alias
+RUN ln -s /usr/src/docky-mc-proxy/target/release/docky-mc-proxy /usr/bin/dmp
 
 # Expose the ports you want to use
 EXPOSE 80 443

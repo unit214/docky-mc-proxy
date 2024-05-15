@@ -92,7 +92,10 @@ fn main() -> ExitCode {
 
             remove_file(&full_path)?;
         }
-        None => {}
+        None => {
+            println!("No command provided. Exiting");
+            return ExitCode::from(1);
+        }
     }
 
     // do not run if command is list

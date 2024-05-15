@@ -10,14 +10,20 @@ permissions:
 name: release-please
 
 jobs:
-  release-please:
+  release-and-publish:
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v4
-        id: release-please
+        id: release
         with:
-          release-type: simple
+          release-type: rust
+    outputs:
+      release_created:  ${{ steps.release.outputs.release_created }}
 
+  publish:
+    runs-on: ubuntu-latest
+    if:  ${{ needs.release-please.outputs.release_created }}
+    steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -31,7 +37,6 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push Docker image
-        if: steps.release-please.outputs.release_created
         uses: docker/build-push-action@v2
         with:
           context: .

@@ -1,0 +1,22 @@
+# /etc/nginx/conf.d/template.conf
+
+server {
+    listen       443 ssl;
+    server_name  __DOMAIN_PLACEHOLDER__;  # Replace with your subdomain
+
+    # SSL configuration
+    ssl_certificate      /etc/nginx/ssl/cert.pem;  # Replace with your certificate path
+    ssl_certificate_key  /etc/nginx/ssl/key.pem;  # Replace with your certificate key path
+
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+
+    # Proxy requests to localhost:XXXX
+    location / {
+        proxy_pass http://localhost:XXXX;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

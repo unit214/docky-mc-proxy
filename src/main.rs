@@ -1,0 +1,139 @@
+use clap::{Parser, Subcommand};
+use std::fs::{OpenOptions, metadata, copy, read_to_string, remove_file, read_dir};
+use std::io::{self, prelude::*};
+use std::path::{Path, PathBuf};
+use regex::Regex;
+use std::process::Command;
+
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[command(subcommand)]
+    command: Option<Commands>,
+
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    Add {
+        /// Subdomain
+        #[arg(short, long)]
+        subdomain: String,
+
+        /// Force / overwrite
+        #[arg(short, long)]
+        force: bool,
+
+        /// Which port the redirect should go to
+        #[arg(short, long)]
+        port: u16,
+    },
+    Remove {
+        /// Subdomain
+        #[arg(short, long)]
+        subdomain: String,
+    },
+    List {},
+}
+
+fn file_exists(path: &PathBuf) -> bool {
+    metadata(path).is_ok()
+}
+
+const CONFIG_FOLDER: &str = "./conf/";
+const TEMPLATE: &str = "./conf/base.conf.template";
+const DOMAIN: &str = ".traefik.me";
+
+fn main() -> io::Result<()> {
+    let args = Args::parse();
+
+    match &args.command {
+        Some(Commands::List {}) => {
+            // read dir
+            if let Ok(entries) = read_dir(CONFIG_FOLDER) {
+                for entry in entries {
+                    let entry = entry?;
+                    let path = entry.path();
+                    if path.is_file() {
+                        let contents = read_to_string(&path)?;
+                        let domain_placeholder = extract_domain_placeholder(&contents);
+                        let port_placeholder = extract_port_placeholder(&contents);
+                        if let (Some(domain), Some(port)) = (domain_placeholder, port_placeholder) {
+                            println!("{} --> localhost:{}", domain, port);
+                        }
+                    }
+                }
+            }
+        }
+        Some(Commands::Add { force, subdomain, port }) => {
+            let full_domain = parse_subdomain(&subdomain);
+            let full_path = Path::new(CONFIG_FOLDER).join(format!("{}{}", &full_domain, ".conf"));
+
+            // check if file exists
+            if file_exists(&full_path) && !force {
+                println!("File exists. Please use the --force or -f parameter to overwrite");
+                return Ok(());
+            }
+
+            // Copy base config
+            copy(TEMPLATE, &full_path)?;
+
+            // update base config with args
+            let contents = read_to_string(&full_path)?;
+            let new = contents.replace("XXXX", &*port.to_string()).replace("__DOMAIN_PLACEHOLDER__", &full_domain);
+
+            let mut file = OpenOptions::new().write(true).truncate(true).open(&full_path)?;
+            file.write(new.as_bytes())?;
+        }
+        Some(Commands::Remove { subdomain }) => {
+            let full_domain = parse_subdomain(&subdomain);
+            let full_path = Path::new(CONFIG_FOLDER).join(format!("{}{}", &full_domain, ".conf"));
+
+            if !file_exists(&full_path) {
+                println!("File does not exists. No changes are made.");
+                return Ok(());
+            }
+
+            remove_file(&full_path)?;
+        }
+        None => {}
+    }
+
+    let output = Command::new("nginx")
+        .arg("-s")
+        .arg("reload")
+        .output()?;
+
+    if output.status.success() {
+        println!("Nginx restarted successfully");
+    }
+
+    Ok(())
+}
+
+fn extract_domain_placeholder(contents: &str) -> Option<String> {
+    let re = Regex::new(r"server_name\s+(\S+);").unwrap();
+    if let Some(captures) = re.captures(contents) {
+        captures.get(1).map(|m| m.as_str().to_string())
+    } else {
+        None
+    }
+}
+
+fn extract_port_placeholder(contents: &str) -> Option<String> {
+    let re = Regex::new(r"proxy_pass http://localhost:(\d+);").unwrap();
+    if let Some(captures) = re.captures(contents) {
+        captures.get(1).map(|m| m.as_str().to_string())
+    } else {
+        None
+    }
+}
+
+fn parse_subdomain(subdomain: &str) -> String {
+    if !subdomain.contains(DOMAIN) {
+        subdomain.to_string() + DOMAIN
+    } else {
+        subdomain.to_string()
+    }
+}

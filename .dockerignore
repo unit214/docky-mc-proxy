@@ -1,0 +1,4 @@
+.idea
+target
+conf/*.conf
+!conf/base.conf.template

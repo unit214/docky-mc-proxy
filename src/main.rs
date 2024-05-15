@@ -37,10 +37,6 @@ enum Commands {
     Init {},
 }
 
-fn file_exists(path: &PathBuf) -> bool {
-    metadata(path).is_ok()
-}
-
 const CONFIG_FOLDER: &str = "./conf/";
 const TEMPLATE: &str = "./conf/base.conf.template";
 const DOMAIN: &str = ".traefik.me";
@@ -49,121 +45,125 @@ fn main() -> io::Result<()> {
     let args = Args::parse();
 
     match &args.command {
-        Some(Commands::Init {}) => {
-            let env = std::env::vars();
-            for (key, value) in env {
-                if key.starts_with("D_") {
-                    let domain = key.replace("D_", "");
-                    let port = value.parse::<u16>().unwrap();
-                    create_new_domain(&domain, &port, &true)?;
-                }
-            }
-        }
-        Some(Commands::List {}) => {
-            // read dir
-            if let Ok(entries) = read_dir(CONFIG_FOLDER) {
-                for entry in entries {
-                    let entry = entry?;
-                    let path = entry.path();
-                    if path.is_file() {
-                        let contents = read_to_string(&path)?;
-                        let domain_placeholder = extract_domain_placeholder(&contents);
-                        let port_placeholder = extract_port_placeholder(&contents);
-                        if let (Some(domain), Some(port)) = (domain_placeholder, port_placeholder) {
-                            println!("{} --> localhost:{}", domain, port);
-                        }
-                    }
-                }
-            }
-        }
+        Some(Commands::Init {}) => initialize_domains()?,
+        Some(Commands::List {}) => list_domains()?,
         Some(Commands::Add {
-            force,
             subdomain,
+            force,
             port,
-        }) => {
-            create_new_domain(&subdomain, &port, force)?;
-        }
-        Some(Commands::Remove { subdomain }) => {
-            let full_domain = parse_subdomain(&subdomain);
-            let full_path = Path::new(CONFIG_FOLDER).join(format!("{}{}", &full_domain, ".conf"));
-
-            if !file_exists(&full_path) {
-                println!("File does not exists. No changes are made.");
-                // Return exit 1 err code
-                exit(1);
-            }
-
-            remove_file(&full_path)?;
-        }
+        }) => create_new_domain(subdomain, *port, *force)?,
+        Some(Commands::Remove { subdomain }) => remove_domain(subdomain)?,
         None => {
             println!("No command provided. Exiting");
             exit(1);
         }
     }
 
-    // do not run if command is list
-    if let Some(Commands::List {}) = &args.command {
-        return Ok(());
-    }
-    let output = Command::new("nginx").arg("-s").arg("reload").output()?;
-
-    if output.status.success() {
-        println!("Nginx restarted successfully");
+    // Do not reload nginx if the command is List
+    if !matches!(args.command, Some(Commands::List {})) {
+        reload_nginx()?;
     }
 
-    return Ok(());
+    Ok(())
 }
 
-fn create_new_domain(subdomain: &str, port: &u16, force: &bool) -> io::Result<()> {
-    let full_domain = parse_subdomain(&subdomain);
-    let full_path = Path::new(CONFIG_FOLDER).join(format!("{}{}", &full_domain, ".conf"));
+fn file_exists(path: &PathBuf) -> bool {
+    metadata(path).is_ok()
+}
 
-    // check if file exists
+fn initialize_domains() -> io::Result<()> {
+    let env_vars = std::env::vars();
+    for (key, value) in env_vars {
+        if key.starts_with("D_") {
+            let domain = key.trim_start_matches("D_").to_string();
+            let port = value.parse::<u16>().expect("Invalid port number");
+            create_new_domain(&domain, port, true)?;
+        }
+    }
+    Ok(())
+}
+
+fn list_domains() -> io::Result<()> {
+    if let Ok(entries) = read_dir(CONFIG_FOLDER) {
+        for entry in entries {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                let contents = read_to_string(&path)?;
+                if let (Some(domain), Some(port)) = (
+                    extract_domain_placeholder(&contents),
+                    extract_port_placeholder(&contents),
+                ) {
+                    println!("{} --> localhost:{}", domain, port);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn create_new_domain(subdomain: &str, port: u16, force: bool) -> io::Result<()> {
+    let full_domain = parse_subdomain(&subdomain);
+    let full_path = Path::new(CONFIG_FOLDER).join(format!("{}.conf", full_domain));
+
     if file_exists(&full_path) && !force {
-        println!("File exists. Please use the --force or -f parameter to overwrite");
+        println!("File exists. Please use the --force or -f parameter to overwrite.");
         exit(1);
     }
 
-    // Copy base config
     copy(TEMPLATE, &full_path)?;
 
-    // update base config with args
     let contents = read_to_string(&full_path)?;
-    let new = contents
-        .replace("XXXX", &*port.to_string())
+    let new_contents = contents
+        .replace("XXXX", &port.to_string())
         .replace("__DOMAIN_PLACEHOLDER__", &full_domain);
 
     let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
         .open(&full_path)?;
-    file.write(new.as_bytes())?;
+    file.write_all(new_contents.as_bytes())?;
+    Ok(())
+}
+
+fn remove_domain(subdomain: &str) -> io::Result<()> {
+    let full_domain = parse_subdomain(&subdomain);
+    let full_path = Path::new(CONFIG_FOLDER).join(format!("{}.conf", full_domain));
+
+    if !file_exists(&full_path) {
+        println!("File does not exist. No changes made.");
+        exit(1);
+    }
+
+    remove_file(full_path)?;
+    Ok(())
+}
+
+fn reload_nginx() -> io::Result<()> {
+    let output = Command::new("nginx").arg("-s").arg("reload").output()?;
+
+    if output.status.success() {
+        println!("Nginx restarted successfully.");
+    } else {
+        eprintln!("Failed to restart Nginx.");
+    }
+
     Ok(())
 }
 
 fn extract_domain_placeholder(contents: &str) -> Option<String> {
     let re = Regex::new(r"server_name\s+(\S+);").unwrap();
-    if let Some(captures) = re.captures(contents) {
-        captures.get(1).map(|m| m.as_str().to_string())
-    } else {
-        None
-    }
+    re.captures(contents)
+        .and_then(|cap| cap.get(1).map(|m| m.as_str().to_string()))
 }
 
 fn extract_port_placeholder(contents: &str) -> Option<String> {
     let re = Regex::new(r"proxy_pass http://localhost:(\d+);").unwrap();
-    if let Some(captures) = re.captures(contents) {
-        captures.get(1).map(|m| m.as_str().to_string())
-    } else {
-        None
-    }
+    re.captures(contents)
+        .and_then(|cap| cap.get(1).map(|m| m.as_str().to_string()))
 }
 
 fn parse_subdomain(subdomain: &str) -> String {
-    let result = if !subdomain.contains(DOMAIN) {
-        subdomain.to_string() + DOMAIN
-    } else {
-        subdomain.to_string()
-    };
+    let result = format!("{}{}", subdomain.trim_end_matches(DOMAIN), DOMAIN);
     result.to_lowercase()
 }

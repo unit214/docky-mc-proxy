@@ -60,6 +60,12 @@ docker exec dockymcproxy dmp remove --subdomain example
 
 ## Development
 
+### Prerequisites
+
+- Rust programming language
+- Cargo package manager
+- Nginx web server
+
 ### Installing
 
 Clone the repository to your local machine:
@@ -79,16 +85,6 @@ Build the project:
 ```bash
 cargo build
 ```
-
-### Prerequisites
-
-- Rust programming language
-- Cargo package manager
-- Nginx web server
-
-or
-
-- Docker
 
 ## Contribute 🤝
 

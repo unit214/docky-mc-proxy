@@ -15,4 +15,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        name: Set up Rust
       - run: cargo build
+        name: Build
+      - uses: mbrobbel/rustfmt-check@master
+        name: Check formatting
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

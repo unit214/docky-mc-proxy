@@ -1,17 +1,16 @@
-use clap::{Parser, Subcommand};
-use std::fs::{OpenOptions, metadata, copy, read_to_string, remove_file, read_dir};
+use std::fs::{copy, metadata, read_dir, read_to_string, remove_file, OpenOptions};
 use std::io::{self, prelude::*};
 use std::path::{Path, PathBuf};
-use regex::Regex;
-use std::process::{Command, exit};
+use std::process::{exit, Command};
 
+use clap::{Parser, Subcommand};
+use regex::Regex;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
     #[command(subcommand)]
     command: Option<Commands>,
-
 }
 
 #[derive(Subcommand, Debug)]
@@ -77,7 +76,11 @@ fn main() -> io::Result<()> {
                 }
             }
         }
-        Some(Commands::Add { force, subdomain, port }) => {
+        Some(Commands::Add {
+            force,
+            subdomain,
+            port,
+        }) => {
             create_new_domain(&subdomain, &port, force)?;
         }
         Some(Commands::Remove { subdomain }) => {
@@ -102,10 +105,7 @@ fn main() -> io::Result<()> {
     if let Some(Commands::List {}) = &args.command {
         return Ok(());
     }
-    let output = Command::new("nginx")
-        .arg("-s")
-        .arg("reload")
-        .output()?;
+    let output = Command::new("nginx").arg("-s").arg("reload").output()?;
 
     if output.status.success() {
         println!("Nginx restarted successfully");
@@ -129,9 +129,14 @@ fn create_new_domain(subdomain: &str, port: &u16, force: &bool) -> io::Result<()
 
     // update base config with args
     let contents = read_to_string(&full_path)?;
-    let new = contents.replace("XXXX", &*port.to_string()).replace("__DOMAIN_PLACEHOLDER__", &full_domain);
+    let new = contents
+        .replace("XXXX", &*port.to_string())
+        .replace("__DOMAIN_PLACEHOLDER__", &full_domain);
 
-    let mut file = OpenOptions::new().write(true).truncate(true).open(&full_path)?;
+    let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(&full_path)?;
     file.write(new.as_bytes())?;
     Ok(())
 }

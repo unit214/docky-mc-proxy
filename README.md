@@ -1,6 +1,6 @@
 # DockyMcProxy 🚀
 
-DockyMcProxy is a Rust-based project that simplifies the process of setting up a local HTTPS reverse proxy using `nginx`. It's a handy tool for developers who want to mimic a production environment locally. 🛠️
+DockyMcProxy is a Rust-based project that simplifies the process of setting up a local HTTPS reverse proxy using [nginx](https://www.nginx.com/). It's a handy tool for developers who want to mimic a production environment locally. 🛠️
 
 ## Key Features 🔑
 

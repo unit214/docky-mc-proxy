@@ -10,7 +10,7 @@ permissions:
 name: release-please
 
 jobs:
-  release-please:
+  release-and-publish:
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v4

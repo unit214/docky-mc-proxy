@@ -36,4 +36,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/dockymcproxy:latest
+          tags: unit214/dockymcproxy:latest

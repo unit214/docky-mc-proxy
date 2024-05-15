@@ -35,6 +35,7 @@ enum Commands {
         subdomain: String,
     },
     List {},
+    Init {},
 }
 
 fn file_exists(path: &PathBuf) -> bool {
@@ -49,6 +50,16 @@ fn main() -> io::Result<()> {
     let args = Args::parse();
 
     match &args.command {
+        Some(Commands::Init {}) => {
+            let env = std::env::vars();
+            for (key, value) in env {
+                if key.starts_with("D_") {
+                    let domain = key.replace("D_", "");
+                    let port = value.parse::<u16>().unwrap();
+                    create_new_domain(&domain, &port, &true)?;
+                }
+            }
+        },
         Some(Commands::List {}) => {
             // read dir
             if let Ok(entries) = read_dir(CONFIG_FOLDER) {
@@ -67,24 +78,7 @@ fn main() -> io::Result<()> {
             }
         }
         Some(Commands::Add { force, subdomain, port }) => {
-            let full_domain = parse_subdomain(&subdomain);
-            let full_path = Path::new(CONFIG_FOLDER).join(format!("{}{}", &full_domain, ".conf"));
-
-            // check if file exists
-            if file_exists(&full_path) && !force {
-                println!("File exists. Please use the --force or -f parameter to overwrite");
-                return Ok(());
-            }
-
-            // Copy base config
-            copy(TEMPLATE, &full_path)?;
-
-            // update base config with args
-            let contents = read_to_string(&full_path)?;
-            let new = contents.replace("XXXX", &*port.to_string()).replace("__DOMAIN_PLACEHOLDER__", &full_domain);
-
-            let mut file = OpenOptions::new().write(true).truncate(true).open(&full_path)?;
-            file.write(new.as_bytes())?;
+           create_new_domain(&subdomain, &port, force)?;
         }
         Some(Commands::Remove { subdomain }) => {
             let full_domain = parse_subdomain(&subdomain);
@@ -100,15 +94,41 @@ fn main() -> io::Result<()> {
         None => {}
     }
 
+    // do not run if command is list
+    if let Some(Commands::List {}) = args.command {
+        return Ok(());
+    }
     let output = Command::new("nginx")
         .arg("-s")
         .arg("reload")
         .output()?;
 
-    if output.status.success() {
+    if output.status.success()  {
         println!("Nginx restarted successfully");
     }
 
+    Ok(())
+}
+
+fn create_new_domain(subdomain: &str, port: &u16, force: &bool) -> io::Result<()> {
+    let full_domain = parse_subdomain(&subdomain);
+    let full_path = Path::new(CONFIG_FOLDER).join(format!("{}{}", &full_domain, ".conf"));
+
+    // check if file exists
+    if file_exists(&full_path) && !force {
+        println!("File exists. Please use the --force or -f parameter to overwrite");
+        return Ok(());
+    }
+
+    // Copy base config
+    copy(TEMPLATE, &full_path)?;
+
+    // update base config with args
+    let contents = read_to_string(&full_path)?;
+    let new = contents.replace("XXXX", &*port.to_string()).replace("__DOMAIN_PLACEHOLDER__", &full_domain);
+
+    let mut file = OpenOptions::new().write(true).truncate(true).open(&full_path)?;
+    file.write(new.as_bytes())?;
     Ok(())
 }
 
@@ -131,9 +151,10 @@ fn extract_port_placeholder(contents: &str) -> Option<String> {
 }
 
 fn parse_subdomain(subdomain: &str) -> String {
-    if !subdomain.contains(DOMAIN) {
+    let result = if !subdomain.contains(DOMAIN) {
         subdomain.to_string() + DOMAIN
     } else {
         subdomain.to_string()
-    }
+    };
+    result.to_lowercase()
 }

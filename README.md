@@ -4,18 +4,18 @@ DockyMcProxy is a Rust-based project that simplifies the process of setting up a
 
 ## Key Features 🔑
 
+- Automatic HTTPS setup with Let's Encrypt. 🔒
+- CLI for easy management. 🖥️
 - Easy setup of subdomains and ports for local development. 🌐
-- Uses `nginx` for request redirection. 🔄
 - Built with Rust for performance and safety. 🦀
 - Docker support for portability. 🐳
-- Automatic HTTPS setup with Let's Encrypt. 🔒
+- Uses [traefik.me](https://traefik.me) for certificates and DNS. 🌍
 
 ## Usage 📖
 
-The easiest way to use DockyMcProxy is to run it with Docker. You can also run it directly on your local machine using
-the Rust programming language. Here's how to use it with both methods.
+The easiest way to use DockyMcProxy is to run it with Docker. You can also run it directly on your local machine using the Rust programming language. Here's how to use it with both methods.
 
-### Running with Docker
+### Running with Docker 🐳
 
 In this example, `D_EXAMPLE=8080` sets up a subdomain `example.traefik.me` that redirects to `localhost:8080`.
 
@@ -23,9 +23,9 @@ In this example, `D_EXAMPLE=8080` sets up a subdomain `example.traefik.me` that 
 docker run --rm --network=host --name "dockymcproxy" -e "D_EXAMPLE=8080" -d unit214/dockymcproxy
 ```
 
-### CLI Usage
+### CLI Usage 💻
 
-When you are running DockyMcProxy on docker, you can access the CLI by running the following command:
+When you are running DockyMcProxy on Docker, you can access the CLI by running the following command:
 
 ```bash
 docker exec -it <container_id> dmp <command>
@@ -58,15 +58,15 @@ cargo run -- remove --subdomain example
 docker exec dockymcproxy dmp remove --subdomain example
 ```
 
-## Development
+## Development 🛠️
 
-### Prerequisites
+### Prerequisites 📋
 
 - Rust programming language
 - Cargo package manager
 - Nginx web server
 
-### Installing
+### Installing 📦
 
 Clone the repository to your local machine:
 
@@ -88,8 +88,8 @@ cargo build
 
 ## Contribute 🤝
 
-Your contributions are welcome! Please read `CONTRIBUTING.md` for details on the process.
+Your contributions are welcome! Please read [CONTRIBUTE.md](./CONTRIBUTE.md) for details on the process.
 
 ## License 📄
 
-This project is licensed under the MIT License - see the `LICENSE.md` file for details.
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.

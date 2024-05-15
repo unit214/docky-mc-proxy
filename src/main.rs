@@ -3,7 +3,7 @@ use std::fs::{OpenOptions, metadata, copy, read_to_string, remove_file, read_dir
 use std::io::{self, prelude::*};
 use std::path::{Path, PathBuf};
 use regex::Regex;
-use std::process::{Command, ExitCode, exit};
+use std::process::{Command, exit};
 
 
 #[derive(Parser, Debug)]
@@ -46,7 +46,7 @@ const CONFIG_FOLDER: &str = "./conf/";
 const TEMPLATE: &str = "./conf/base.conf.template";
 const DOMAIN: &str = ".traefik.me";
 
-fn main() -> ExitCode {
+fn main() -> io::Result<()> {
     let args = Args::parse();
 
     match &args.command {
@@ -59,7 +59,7 @@ fn main() -> ExitCode {
                     create_new_domain(&domain, &port, &true)?;
                 }
             }
-        },
+        }
         Some(Commands::List {}) => {
             // read dir
             if let Ok(entries) = read_dir(CONFIG_FOLDER) {
@@ -78,7 +78,7 @@ fn main() -> ExitCode {
             }
         }
         Some(Commands::Add { force, subdomain, port }) => {
-           create_new_domain(&subdomain, &port, force)?;
+            create_new_domain(&subdomain, &port, force)?;
         }
         Some(Commands::Remove { subdomain }) => {
             let full_domain = parse_subdomain(&subdomain);
@@ -87,31 +87,31 @@ fn main() -> ExitCode {
             if !file_exists(&full_path) {
                 println!("File does not exists. No changes are made.");
                 // Return exit 1 err code
-                return ExitCode::from(1);
+                exit(1);
             }
 
             remove_file(&full_path)?;
         }
         None => {
             println!("No command provided. Exiting");
-            return ExitCode::from(1);
+            exit(1);
         }
     }
 
     // do not run if command is list
     if let Some(Commands::List {}) = &args.command {
-        return ExitCode::from(0);
+        return Ok(());
     }
     let output = Command::new("nginx")
         .arg("-s")
         .arg("reload")
         .output()?;
 
-    if output.status.success()  {
+    if output.status.success() {
         println!("Nginx restarted successfully");
     }
 
-    ExitCode::from(0)
+    return Ok(());
 }
 
 fn create_new_domain(subdomain: &str, port: &u16, force: &bool) -> io::Result<()> {
@@ -121,7 +121,7 @@ fn create_new_domain(subdomain: &str, port: &u16, force: &bool) -> io::Result<()
     // check if file exists
     if file_exists(&full_path) && !force {
         println!("File exists. Please use the --force or -f parameter to overwrite");
-        return exit(1);
+        exit(1);
     }
 
     // Copy base config

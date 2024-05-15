@@ -3,7 +3,7 @@ use std::fs::{OpenOptions, metadata, copy, read_to_string, remove_file, read_dir
 use std::io::{self, prelude::*};
 use std::path::{Path, PathBuf};
 use regex::Regex;
-use std::process::Command;
+use std::process::{Command, ExitCode, exit};
 
 
 #[derive(Parser, Debug)]
@@ -46,7 +46,7 @@ const CONFIG_FOLDER: &str = "./conf/";
 const TEMPLATE: &str = "./conf/base.conf.template";
 const DOMAIN: &str = ".traefik.me";
 
-fn main() -> io::Result<()> {
+fn main() -> ExitCode {
     let args = Args::parse();
 
     match &args.command {
@@ -86,7 +86,8 @@ fn main() -> io::Result<()> {
 
             if !file_exists(&full_path) {
                 println!("File does not exists. No changes are made.");
-                return Ok(());
+                // Return exit 1 err code
+                return ExitCode::from(1);
             }
 
             remove_file(&full_path)?;
@@ -95,8 +96,8 @@ fn main() -> io::Result<()> {
     }
 
     // do not run if command is list
-    if let Some(Commands::List {}) = args.command {
-        return Ok(());
+    if let Some(Commands::List {}) = &args.command {
+        return ExitCode::from(0);
     }
     let output = Command::new("nginx")
         .arg("-s")
@@ -107,7 +108,7 @@ fn main() -> io::Result<()> {
         println!("Nginx restarted successfully");
     }
 
-    Ok(())
+    ExitCode::from(0)
 }
 
 fn create_new_domain(subdomain: &str, port: &u16, force: &bool) -> io::Result<()> {
@@ -117,7 +118,7 @@ fn create_new_domain(subdomain: &str, port: &u16, force: &bool) -> io::Result<()
     // check if file exists
     if file_exists(&full_path) && !force {
         println!("File exists. Please use the --force or -f parameter to overwrite");
-        return Ok(());
+        return exit(1);
     }
 
     // Copy base config

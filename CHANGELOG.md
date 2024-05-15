@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/unit214/docky-mc-proxy/compare/v0.1.0...v0.2.0) (2024-05-15)
+
+
+### Features
+
+* adds rustfmt ([6facc62](https://github.com/unit214/docky-mc-proxy/commit/6facc625aeb3be32ee04f4da85ae22ced0eed9ae))
+
 ## 0.1.0 (2024-05-15)
 
 
